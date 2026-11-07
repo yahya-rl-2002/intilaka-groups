@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Administration — Intilaka Group</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="admin.css">
+  <link rel="stylesheet" href="admin-calendar.css">
+</head>
+<body>
+  <main class="admin-shell">
+    <section class="auth-card" id="authCard">
+      <div class="auth-brand"><span>↗</span><strong>INTILAKA<small>GROUP</small></strong></div>
+      <p class="auth-kicker">ESPACE ADMINISTRATEUR</p>
+      <h1 id="authTitle">Connexion</h1>
+      <p id="authIntro">Connectez-vous pour gérer les demandes de consultation.</p>
+      <form id="authForm">
+        <label class="token-field" hidden>Code de configuration<input name="token" type="text" autocomplete="off"></label>
+        <label>Mot de passe<input name="password" type="password" minlength="10" autocomplete="current-password" required></label>
+        <label class="confirm-field" hidden>Confirmer le mot de passe<input name="confirm" type="password" minlength="10" autocomplete="new-password"></label>
+        <p class="auth-error" role="alert"></p>
+        <button type="submit">Continuer <span>→</span></button>
+      </form>
+      <a href="/">← Retour au site</a>
+    </section>
+
+    <section class="dashboard" id="dashboard" hidden>
+      <header class="admin-header">
+        <div class="admin-brand"><span>↗</span><p><strong>INTILAKA</strong><small>ADMINISTRATION</small></p></div>
+        <div><a class="export-button" href="/api/admin/export.csv">Exporter CSV</a><button id="logoutButton">Déconnexion</button></div>
+      </header>
+
+      <div class="dashboard-title">
+        <div><p>TABLEAU DE BORD</p><h1>Consultations</h1></div>
+        <div class="title-actions"><div class="view-toggle"><button class="active" data-view="calendar">Calendrier</button><button data-view="list">Liste</button></div><span id="lastUpdated"></span></div>
+      </div>
+
+      <div class="stats">
+        <article><span>TOTAL</span><strong id="statTotal">0</strong></article>
+        <article><span>EN ATTENTE</span><strong id="statPending">0</strong></article>
+        <article><span>CONFIRMÉES</span><strong id="statConfirmed">0</strong></article>
+        <article><span>TERMINÉES</span><strong id="statCompleted">0</strong></article>
+      </div>
+
+      <section class="calendar-panel" id="calendarPanel">
+        <div class="calendar-toolbar">
+          <div class="date-navigation"><button id="previousDay" aria-label="Jour précédent">←</button><button id="todayButton">Aujourd’hui</button><button id="nextDay" aria-label="Jour suivant">→</button></div>
+          <div class="selected-date"><small id="calendarPeriodLabel">JOURNÉE SÉLECTIONNÉE</small><h2 id="calendarDateTitle"></h2></div>
+          <label class="date-picker">Choisir une date<input id="calendarDate" type="date"></label>
+        </div>
+        <div class="calendar-tools">
+          <div class="calendar-view-switch" aria-label="Type d’affichage"><button class="active" data-calendar-view="day">Jour</button><button data-calendar-view="week">Semaine</button><button data-calendar-view="month">Mois</button></div>
+          <label>Service<select id="calendarServiceFilter"><option value="">Tous les services</option><option value="studies">Études</option><option value="visa">Visa & résidence</option><option value="general">Évaluation générale</option></select></label>
+          <label>Statut<select id="calendarStatusFilter"><option value="">Tous les statuts</option><option value="pending">En attente</option><option value="confirmed">Confirmée</option><option value="completed">Terminée</option><option value="cancelled">Annulée</option></select></label>
+          <div class="calendar-tool-actions"><button id="calendarRefresh" title="Actualiser">↻ <span>Actualiser</span></button><button id="calendarPrint" title="Imprimer">⌑ <span>Imprimer</span></button></div>
+        </div>
+        <div class="day-summary"><span><b id="dayTotal">0</b> rendez-vous</span><span class="summary-pending"><b id="dayPending">0</b> en attente</span><span class="summary-confirmed"><b id="dayConfirmed">0</b> confirmés</span></div>
+        <div class="calendar-canvas"><div class="day-calendar" id="dayCalendar" aria-live="polite"></div></div>
+      </section>
+
+      <section class="list-panel" id="listPanel" hidden>
+        <div class="toolbar">
+          <label class="search"><span>⌕</span><input id="searchInput" type="search" placeholder="Nom, téléphone, référence…"></label>
+          <label class="status-filter">Statut<select id="statusFilter"><option value="">Tous</option><option value="pending">En attente</option><option value="confirmed">Confirmée</option><option value="completed">Terminée</option><option value="cancelled">Annulée</option></select></label>
+          <button id="refreshButton">Actualiser</button>
+        </div>
+        <div class="reservation-list" id="reservationList"></div>
+        <div class="empty-state" id="emptyState" hidden><span>⌑</span><h2>Aucune réservation</h2><p>Les nouvelles demandes apparaîtront ici.</p></div>
+      </section>
+    </section>
+  </main>
+  <div class="calendar-detail-modal" id="calendarDetailModal" hidden><div class="calendar-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="calendarDetailTitle"><button class="calendar-detail-close" aria-label="Fermer">×</button><div class="calendar-detail-kicker">FICHE DE RENDEZ-VOUS</div><h2 id="calendarDetailTitle"></h2><div class="calendar-detail-grid" id="calendarDetailGrid"></div><label>Statut<select id="calendarDetailStatus"><option value="pending">En attente</option><option value="confirmed">Confirmée</option><option value="completed">Terminée</option><option value="cancelled">Annulée</option></select></label><label>Notes internes<textarea id="calendarDetailNotes" rows="4" maxlength="2000"></textarea></label><div class="calendar-detail-actions"><a id="calendarDetailWhatsapp" target="_blank" rel="noreferrer">WhatsApp ↗</a><button id="calendarDetailSave">Enregistrer</button></div><p id="calendarDetailFeedback" role="status"></p></div></div>
+  <script src="admin.js"></script>
+  <script src="admin-calendar.js"></script>
+</body>
+</html>
