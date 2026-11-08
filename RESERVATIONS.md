@@ -16,23 +16,9 @@ Il faut utiliser `server.py` : un simple serveur statique ne peut pas enregistre
 
 ## Première connexion
 
-1. Au premier lancement, le terminal affiche un « code de première configuration ».
-2. Ouvrez `/admin`, saisissez ce code et créez un mot de passe d'au moins 10 caractères.
+1. Ouvrez `/admin` immédiatement après le premier lancement.
+2. Créez un mot de passe administrateur d'au moins 10 caractères.
 3. Conservez ce mot de passe dans un gestionnaire de mots de passe.
-
-Après 5 échecs de connexion, l'adresse IP est bloquée pendant 15 minutes. L'espace admin n'est plus lié depuis le site public : accédez-y directement via `/admin`.
-
-## Recevoir un e-mail à chaque demande
-
-Copiez `.env.example` en `.env`, remplissez le mot de passe, puis lancez le site avec `start.command`. Sans cette configuration, les demandes restent visibles uniquement dans `/admin`.
-
-## Créneaux
-
-Les heures sont celles du Maroc (`INTILAKA_TZ` pour changer de fuseau) et le dimanche est fermé (`CLOSED_WEEKDAYS` dans `server.py`).
-
-## Ajouter une image ou un fichier au site
-
-Seuls les fichiers listés dans `PUBLIC_FILES` (`server.py`) sont servis. Ajoutez-y tout nouveau fichier, sinon il renverra une erreur 404.
 
 Le mot de passe n'est jamais stocké en clair. Il n'existe pas de mot de passe par défaut.
 
