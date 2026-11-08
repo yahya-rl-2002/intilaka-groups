@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#092b62">
+  <title>Pointage — Intilaka Group</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Kufi+Arabic:wght@500;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/pointage.css?v=1">
+</head>
+<body>
+  <main class="clock-shell">
+    <header class="clock-header">
+      <div class="clock-brand"><span>↗</span><p><strong>INTILAKA</strong><small>POINTAGE · <bdi lang="ar">تسجيل الحضور</bdi></small></p></div>
+      <div class="clock-now"><b id="clockTime">--:--</b><small id="clockDate"></small></div>
+    </header>
+
+    <section class="clock-card" id="stepNames">
+      <p class="clock-kicker">ÉTAPE 1 · <bdi lang="ar">الخطوة 1</bdi></p>
+      <h1>Qui êtes-vous ? <bdi lang="ar">من أنت؟</bdi></h1>
+      <div class="name-grid" id="nameGrid" aria-live="polite"></div>
+      <p class="clock-message" id="namesMessage" role="status"></p>
+    </section>
+
+    <section class="clock-card" id="stepPin" hidden>
+      <button class="back-link" type="button" data-back>← Retour · <bdi lang="ar">رجوع</bdi></button>
+      <p class="clock-kicker">ÉTAPE 2 · <bdi lang="ar">الخطوة 2</bdi></p>
+      <h1 id="pinTitle"></h1>
+      <p class="clock-hint">Entrez votre code PIN · <bdi lang="ar">أدخل رمزك السري</bdi></p>
+      <div class="pin-dots" id="pinDots" aria-hidden="true"></div>
+      <div class="keypad" id="keypad"></div>
+      <p class="clock-message error" id="pinMessage" role="alert"></p>
+    </section>
+
+    <section class="clock-card" id="stepActions" hidden>
+      <button class="back-link" type="button" data-back>← Changer de personne · <bdi lang="ar">تغيير الشخص</bdi></button>
+      <p class="clock-kicker">ÉTAPE 3 · <bdi lang="ar">الخطوة 3</bdi></p>
+      <h1 id="actionsTitle"></h1>
+      <p class="state-pill" id="statePill"></p>
+      <div class="action-grid" id="actionGrid"></div>
+      <div class="today-box">
+        <div class="today-head"><span>Aujourd’hui · <bdi lang="ar">اليوم</bdi></span><b id="todayWorked"></b></div>
+        <ol class="today-list" id="todayList"></ol>
+      </div>
+    </section>
+
+    <section class="clock-card success-card" id="stepDone" hidden>
+      <div class="success-icon">✓</div>
+      <h1 id="doneTitle"></h1>
+      <p id="doneText"></p>
+      <button class="primary-button" type="button" data-back>Terminer · <bdi lang="ar">إنهاء</bdi></button>
+    </section>
+  </main>
+  <script src="/pointage.js?v=2"></script>
+</body>
+</html>

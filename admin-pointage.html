@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Pointage — Administration Intilaka</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/admin.css?v=20261026">
+  <link rel="stylesheet" href="/admin-pointage.css?v=1">
+</head>
+<body>
+  <main class="dashboard" id="dashboard" hidden>
+    <header class="admin-header">
+      <div class="admin-brand"><span>↗</span><p><strong>INTILAKA</strong><small>ADMINISTRATION</small></p></div>
+      <nav class="admin-nav"><a href="/admin">Consultations</a><a class="active" href="/admin/pointage">Pointage</a><button id="logoutButton" type="button">Déconnexion</button></nav>
+    </header>
+
+    <div class="network-alert" id="networkAlert" hidden></div>
+
+    <div class="dashboard-title">
+      <div><p>PRÉSENCE DU PERSONNEL</p><h1>Pointage</h1></div>
+      <div class="pt-date-nav"><button id="prevDay" type="button" aria-label="Jour précédent">←</button><button id="todayBtn" type="button">Aujourd’hui</button><button id="nextDay" type="button" aria-label="Jour suivant">→</button><input id="dayInput" type="date" aria-label="Choisir une date"></div>
+    </div>
+
+    <div class="stats">
+      <article><span>PRÉSENTS</span><strong id="statPresent">0</strong></article>
+      <article><span>EN PAUSE</span><strong id="statBreak">0</strong></article>
+      <article><span>RETARDS</span><strong id="statLate">0</strong></article>
+      <article><span>ABSENTS</span><strong id="statAbsent">0</strong></article>
+    </div>
+
+    <section class="pt-panel">
+      <div class="pt-panel-head"><div><small>JOURNÉE</small><h2 id="dayTitle"></h2></div><button id="refreshBtn" type="button">↻ Actualiser</button></div>
+      <div class="pt-table-wrap"><table class="pt-table" id="dayTable"><thead><tr><th>Salarié</th><th>Statut</th><th>Arrivée</th><th>Départ</th><th>Pauses</th><th>Travaillé</th><th>Retard</th><th></th></tr></thead><tbody></tbody></table></div>
+      <p class="pt-empty" id="dayEmpty" hidden>Ajoutez vos salariés dans la section « Salariés » ci-dessous pour commencer.</p>
+    </section>
+
+    <section class="pt-panel">
+      <div class="pt-panel-head"><div><small>RÉCAPITULATIF</small><h2>Mois</h2></div><div class="pt-inline"><input id="monthInput" type="month" aria-label="Choisir un mois"><a class="export-button" id="exportLink" href="#">Exporter Excel (CSV)</a></div></div>
+      <div class="pt-table-wrap"><table class="pt-table" id="monthTable"><thead><tr><th>Salarié</th><th>Jours présents</th><th>Heures travaillées</th><th>Pauses</th><th>Retards</th><th>Absences</th><th>Départs non pointés</th></tr></thead><tbody></tbody></table></div>
+    </section>
+
+    <div class="pt-columns">
+      <section class="pt-panel">
+        <div class="pt-panel-head"><div><small>ÉQUIPE</small><h2>Salariés</h2></div></div>
+        <ul class="employee-list" id="employeeList"></ul>
+        <form class="pt-form" id="employeeForm">
+          <h3>Ajouter un salarié</h3>
+          <div class="pt-form-row"><label>Nom complet<input name="name" minlength="2" maxlength="60" required autocomplete="off"></label><label>Code PIN (4 à 8 chiffres)<input name="pin" inputmode="numeric" pattern="\d{4,8}" minlength="4" maxlength="8" required autocomplete="off"></label></div>
+          <button type="submit">Ajouter</button>
+          <p class="pt-feedback" role="status"></p>
+        </form>
+      </section>
+
+      <section class="pt-panel">
+        <div class="pt-panel-head"><div><small>RÉGLAGES</small><h2>Horaires & réseau</h2></div></div>
+        <form class="pt-form" id="settingsForm">
+          <label>Fuseau horaire du bureau<select name="timezone"><option value="Africa/Casablanca">Maroc (Tétouan)</option><option value="Europe/Madrid">Espagne (Malaga)</option></select></label>
+          <div class="pt-form-row"><label>Début de journée<input name="work_start" type="time" required></label><label>Fin de journée<input name="work_end" type="time" required></label><label>Tolérance retard (min)<input name="late_tolerance" type="number" min="0" max="120" required></label></div>
+          <fieldset><legend>Jours travaillés</legend><div class="day-checks" id="dayChecks"></div></fieldset>
+          <fieldset><legend>Réseaux du bureau autorisés</legend>
+            <p class="pt-help">Le pointage n’est accepté que depuis ces adresses Internet. Connectez-vous depuis le Wi-Fi du bureau et cliquez sur « Autoriser ce réseau ».</p>
+            <ul class="network-list" id="networkList"></ul>
+            <div class="pt-inline"><button type="button" class="secondary" id="addCurrentNetwork"></button></div>
+          </fieldset>
+          <button type="submit">Enregistrer les réglages</button>
+          <p class="pt-feedback" role="status"></p>
+        </form>
+      </section>
+    </div>
+  </main>
+  <script src="/admin-pointage.js?v=2"></script>
+</body>
+</html>
