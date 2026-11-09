@@ -1,0 +1,40 @@
+www.intilakagroup.com {
+	redir https://intilakagroup.com{uri} permanent
+}
+
+intilakagroup.com {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+		Cross-Origin-Opener-Policy "same-origin"
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data:; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; upgrade-insecure-requests"
+		-Server
+	}
+	# SEO : une URL propre par langue (/, /fr/, /en/), sans doublons
+	redir /index.html / permanent
+	redir /fr /fr/ permanent
+	redir /en /en/ permanent
+	redir /fr/index.html /fr/ permanent
+	redir /en/index.html /en/ permanent
+	rewrite /fr/ /fr/index.html
+	rewrite /en/ /en/index.html
+
+	# Images et icônes : gardées 30 jours par le navigateur
+	@static path *.jpg *.jpeg *.png *.webp *.svg *.ico
+	header @static Cache-Control "public, max-age=2592000"
+
+	# robots.txt et sitemap.xml servis directement par Caddy
+	@seofiles path /robots.txt /sitemap.xml
+	handle @seofiles {
+		root * /opt/intilaka
+		file_server
+	}
+
+	handle {
+		reverse_proxy 127.0.0.1:4173
+	}
+}

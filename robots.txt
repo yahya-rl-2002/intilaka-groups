@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /admin.html
+Disallow: /admin-pointage.html
+Disallow: /pointage.html
+Disallow: /api/
+
+Sitemap: https://intilakagroup.com/sitemap.xml
