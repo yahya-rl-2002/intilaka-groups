@@ -1,53 +1,45 @@
 #!/usr/bin/env python3
 """Intilaka Group website and reservation API (standard-library only)."""
 from __future__ import annotations
-import csv, hashlib, hmac, io, json, os, re, secrets, smtplib, sqlite3, threading, time
+import csv, getpass, hashlib, hmac, io, json, os, re, secrets, sqlite3, sys, time
 from datetime import date, datetime, timezone
-from email.message import EmailMessage
 from http import cookies
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
-from zoneinfo import ZoneInfo
+from urllib.parse import parse_qs, unquote, urlparse
+import pointage
 
 ROOT = Path(__file__).resolve().parent
 DATA_DIR = ROOT / "data"
 DB_PATH = Path(os.environ.get("INTILAKA_DB", str(DATA_DIR / "intilaka.db"))).resolve()
 HOST = os.environ.get("INTILAKA_HOST", "127.0.0.1")
 PORT = int(os.environ.get("INTILAKA_PORT", "4173"))
+# Production flags: behind a HTTPS reverse proxy (Caddy), set these to "1" / "0".
+TRUST_PROXY = os.environ.get("INTILAKA_TRUST_PROXY") == "1"
+SECURE_COOKIES = os.environ.get("INTILAKA_SECURE_COOKIES") == "1"
+WEB_SETUP = os.environ.get("INTILAKA_WEB_SETUP", "1") == "1"
 SESSIONS: dict[str, tuple[float, str]] = {}
 SUBMISSION_LOG: dict[str, list[float]] = {}
+LOGIN_FAILURES: dict[str, list[float]] = {}
+ALLOWED_LANGUAGES = {"ar", "fr", "en"}
+# Only these file types are ever served; everything else (source, database, dotfiles, folders) is a 404.
+STATIC_EXTENSIONS = {".html", ".css", ".js", ".png", ".jpg", ".jpeg", ".webp", ".svg", ".ico", ".gif", ".woff", ".woff2"}
+BLOCKED_DIRS = {"data", "deploy", "__pycache__"}
 ALLOWED_SERVICES = {"studies", "visa", "general"}
 ALLOWED_TIMES = {"09:00", "10:00", "11:00", "12:00", "14:00", "15:00", "16:00", "17:00"}
 ALLOWED_STATUSES = {"pending", "confirmed", "completed", "cancelled"}
-BUSINESS_TZ = ZoneInfo(os.environ.get("INTILAKA_TZ", "Africa/Casablanca"))
-CLOSED_WEEKDAYS = {6}  # Monday=0 ... Sunday=6
-AUTH_FAILURES: dict[str, list[float]] = {}
-AUTH_MAX_FAILURES = 5
-AUTH_WINDOW_SECONDS = 900
-SETUP_TOKEN = os.environ.get("INTILAKA_SETUP_TOKEN") or secrets.token_urlsafe(16)
-# Only these files are ever served. Everything else in the folder (database, source, backups) stays private.
-PUBLIC_FILES = frozenset({
-    "index.html", "site.css", "site.js",
-    "admin.html", "admin.css", "admin.js", "admin-calendar.css", "admin-calendar.js",
-    "assets/intilaka-advisor-hero.jpg", "assets/intilaka-advisor-hero.png", "assets/cas-residence-masque.jpg",
-    "Instagram/imgi_2_722953413_17978082870013708_4713938570986959581_n.jpg",
-    "Instagram/imgi_12_774008361_1536788880991438_3124231926748838089_n.jpg",
-    "Instagram/imgi_13_741000898_17981658114013708_8256144421396316375_n.jpg",
-    "Instagram/imgi_16_755464572_17983926039013708_2483299330115498558_n.jpg",
-    "Instagram/imgi_17_744784266_17982399588013708_8386952833328561752_n.jpg",
-    "Instagram/imgi_18_746557481_17982272163013708_1723450230050494446_n.jpg",
-    "Instagram/imgi_19_743940461_17982139191013708_4190382884018373688_n.jpg",
-})
 
 def db():
     connection = sqlite3.connect(DB_PATH)
     connection.row_factory = sqlite3.Row
     return connection
 
+pointage.connect = db
+
 def init_db():
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     with db() as connection:
+        pointage.init_db(connection)
         connection.executescript("""
         CREATE TABLE IF NOT EXISTS admin (
           id INTEGER PRIMARY KEY CHECK(id=1), salt TEXT NOT NULL,
@@ -69,46 +61,27 @@ def init_db():
 def password_hash(password: str, salt: bytes) -> str:
     return hashlib.pbkdf2_hmac("sha256", password.encode(), salt, 240_000).hex()
 
+def recent_hits(log, key, window):
+    now = time.time()
+    hits = [stamp for stamp in log.get(key, []) if now - stamp < window]
+    if hits: log[key] = hits
+    else: log.pop(key, None)
+    return hits
+
+def prune(log, window):
+    for key in list(log): recent_hits(log, key, window)
+
+def csv_safe(value):
+    text = str(value)
+    return "'" + text if text[:1] in ("=", "+", "-", "@", "\t", "\r") else text
+
 def json_bytes(value):
     return json.dumps(value, ensure_ascii=False).encode("utf-8")
 
-def setup_required():
-    with db() as connection:
-        return connection.execute("SELECT 1 FROM admin WHERE id=1").fetchone() is None
-
-def send_notification(message):
-    host, port = os.environ["INTILAKA_SMTP_HOST"], int(os.environ.get("INTILAKA_SMTP_PORT", "587"))
-    user, password = os.environ.get("INTILAKA_SMTP_USER"), os.environ.get("INTILAKA_SMTP_PASSWORD")
-    try:
-        with (smtplib.SMTP_SSL(host, port, timeout=15) if port == 465 else smtplib.SMTP(host, port, timeout=15)) as smtp:
-            if port != 465:
-                smtp.ehlo()
-                if smtp.has_extn("starttls"): smtp.starttls(); smtp.ehlo()
-                elif user: raise smtplib.SMTPException("STARTTLS unavailable, refusing to send the password in clear text")
-            if user: smtp.login(user, password or "")
-            smtp.send_message(message)
-        print(f"[notification] envoyée pour {message['X-Intilaka-Reference']}")
-    except (OSError, smtplib.SMTPException) as error:
-        print(f"[notification] ÉCHEC pour {message['X-Intilaka-Reference']} : {type(error).__name__}: {error}")
-
-def notify_new_reservation(values, reference):
-    recipient = os.environ.get("INTILAKA_NOTIFY_TO")
-    if not (recipient and os.environ.get("INTILAKA_SMTP_HOST")):
-        print(f"[notification] non configurée, nouvelle demande {reference} visible dans /admin")
-        return
-    message = EmailMessage()
-    message["Subject"] = f"Nouvelle demande {reference} — {values['date']} à {values['time']}"
-    message["From"] = os.environ.get("INTILAKA_SMTP_USER") or recipient
-    message["To"] = recipient
-    message["X-Intilaka-Reference"] = reference
-    message.set_content(
-        f"Référence : {reference}\nNom : {values['name']}\nWhatsApp : {values['phone']}\n"
-        f"E-mail : {values['email'] or '—'}\nRendez-vous : {values['date']} à {values['time']}\n\n{values['message']}\n"
-    )
-    threading.Thread(target=send_notification, args=(message,), daemon=True).start()
-
 class Handler(SimpleHTTPRequestHandler):
-    server_version = "Intilaka/1.0"
+    server_version = "Intilaka"
+    sys_version = ""
+    timeout = 20
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(ROOT), **kwargs)
@@ -116,7 +89,14 @@ class Handler(SimpleHTTPRequestHandler):
     def log_message(self, fmt, *args):
         print(f"[{self.log_date_time_string()}] {fmt % args}")
 
+    def end_headers(self):
+        # Pages, CSS and JS are revalidated on every visit so updates show up immediately (cheap 304 when unchanged).
+        if self.command in {"GET", "HEAD"} and not getattr(self, "_json_response", False):
+            if Path(urlparse(self.path).path).suffix.lower() in {"", ".html", ".css", ".js"}: self.send_header("Cache-Control", "no-cache")
+        super().end_headers()
+
     def send_json(self, status, payload, headers=None):
+        self._json_response = True
         body = json_bytes(payload)
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
@@ -127,12 +107,31 @@ class Handler(SimpleHTTPRequestHandler):
         self.end_headers(); self.wfile.write(body)
 
     def read_json(self):
+        if not self.headers.get("Content-Type", "").startswith("application/json"): return None
         try:
             length = int(self.headers.get("Content-Length", "0"))
-            if length > 20_000: raise ValueError("Payload too large")
-            return json.loads(self.rfile.read(length) or b"{}")
-        except (ValueError, json.JSONDecodeError):
+            if length < 0 or length > 20_000: raise ValueError("Invalid payload size")
+            data = json.loads(self.rfile.read(length) or b"{}")
+        except (ValueError, UnicodeDecodeError):
             return None
+        return data if isinstance(data, dict) else None
+
+    def send_head(self):
+        # Shared by GET and HEAD: decode the path before checking it so "%73erver.py" cannot slip through.
+        path = unquote(urlparse(self.path).path)
+        parts = [part for part in path.split("/") if part]
+        if path in {"/", "/index.html", "/admin.html"}:
+            pass
+        elif (not parts or ".." in parts or any(part.startswith(".") for part in parts) or parts[0] in BLOCKED_DIRS
+              or Path(path).suffix.lower() not in STATIC_EXTENSIONS or not (ROOT / Path(*parts)).is_file()):
+            self.send_error(404); return None
+        return super().send_head()
+
+    def client_ip(self):
+        if TRUST_PROXY:
+            forwarded = self.headers.get("X-Forwarded-For", "").split(",")[-1].strip()
+            if forwarded: return forwarded
+        return self.client_address[0]
 
     def session(self):
         jar = cookies.SimpleCookie(self.headers.get("Cookie", ""))
@@ -150,23 +149,12 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_json(403, {"error": "invalid_csrf"}); return None
         return session
 
-    def send_head(self):
-        # Checked on the path the filesystem will really open, so URL spellings like /./data or /%64ata cannot slip through.
-        target = Path(self.translate_path(self.path)).resolve()
-        if target != ROOT and (not target.is_relative_to(ROOT) or target.relative_to(ROOT).as_posix() not in PUBLIC_FILES):
-            self.send_error(404)
-            return None
-        return super().send_head()
-
-    def recent_auth_failures(self):
-        now = time.time()
-        recent = [stamp for stamp in AUTH_FAILURES.get(self.client_address[0], []) if now - stamp < AUTH_WINDOW_SECONDS]
-        AUTH_FAILURES[self.client_address[0]] = recent
-        return recent
-
     def do_GET(self):
         parsed = urlparse(self.path)
         if parsed.path == "/admin": self.path = "/admin.html"; return super().do_GET()
+        if parsed.path == "/admin/pointage": self.path = "/admin-pointage.html"; return super().do_GET()
+        if parsed.path == "/pointage": self.path = "/pointage.html"; return super().do_GET()
+        if pointage.handle(self, "GET", parsed.path, parse_qs(parsed.query)): return
         if parsed.path == "/api/availability": return self.availability(parsed)
         if parsed.path == "/api/admin/state": return self.admin_state()
         if parsed.path == "/api/admin/reservations": return self.list_reservations(parsed)
@@ -175,6 +163,7 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         path = urlparse(self.path).path
+        if pointage.handle(self, "POST", path, {}): return
         if path == "/api/reservations": return self.create_reservation()
         if path == "/api/admin/setup": return self.admin_setup()
         if path == "/api/admin/login": return self.admin_login()
@@ -182,28 +171,34 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_json(404, {"error": "not_found"})
 
     def do_PATCH(self):
-        match = re.fullmatch(r"/api/admin/reservations/(\d+)", urlparse(self.path).path)
+        path = urlparse(self.path).path
+        if pointage.handle(self, "PATCH", path, {}): return
+        match = re.fullmatch(r"/api/admin/reservations/(\d+)", path)
         if match: return self.update_reservation(int(match.group(1)))
+        self.send_json(404, {"error": "not_found"})
+
+    def do_DELETE(self):
+        if pointage.handle(self, "DELETE", urlparse(self.path).path, {}): return
         self.send_json(404, {"error": "not_found"})
 
     def availability(self, parsed):
         selected = parse_qs(parsed.query).get("date", [""])[0]
-        try: selected_date = date.fromisoformat(selected)
+        try: date.fromisoformat(selected)
         except ValueError: return self.send_json(400, {"error": "invalid_date"})
-        now = datetime.now(BUSINESS_TZ)
-        past = [slot for slot in ALLOWED_TIMES if selected_date == now.date() and slot <= now.strftime("%H:%M")]
         with db() as connection:
             rows = connection.execute("SELECT appointment_time FROM reservations WHERE appointment_date=? AND status!='cancelled'", (selected,)).fetchall()
-        self.send_json(200, {"date": selected, "booked": [row[0] for row in rows], "past": past, "closed": selected_date.weekday() in CLOSED_WEEKDAYS})
+        self.send_json(200, {"date": selected, "booked": [row[0] for row in rows]})
 
     def create_reservation(self):
-        client_ip = self.client_address[0]
-        now_seconds = time.time()
-        recent = [stamp for stamp in SUBMISSION_LOG.get(client_ip, []) if now_seconds - stamp < 600]
+        client_ip = self.client_ip()
+        if len(SUBMISSION_LOG) > 5000: prune(SUBMISSION_LOG, 600)
+        recent = recent_hits(SUBMISSION_LOG, client_ip, 600)
         if len(recent) >= 8: return self.send_json(429, {"error": "too_many_requests"})
-        recent.append(now_seconds); SUBMISSION_LOG[client_ip] = recent
+        SUBMISSION_LOG[client_ip] = recent + [time.time()]
         data = self.read_json()
         if data is None: return self.send_json(400, {"error": "invalid_json"})
+        # Honeypot: the "website" field is invisible to people, so only bots fill it. Pretend success.
+        if str(data.get("website", "")).strip(): return self.send_json(201, {"ok": True, "reference": "INT-" + secrets.token_hex(3).upper()})
         values = {key: str(data.get(key, "")).strip() for key in ("name","phone","email","service","date","time","message","language")}
         if len(values["name"]) < 2 or len(values["name"]) > 100: return self.send_json(400, {"error": "invalid_name"})
         if not re.fullmatch(r"[+0-9 ()-]{7,30}", values["phone"]): return self.send_json(400, {"error": "invalid_phone"})
@@ -212,30 +207,25 @@ class Handler(SimpleHTTPRequestHandler):
         if values["time"] not in ALLOWED_TIMES: return self.send_json(400, {"error": "invalid_time"})
         try: selected_date = date.fromisoformat(values["date"])
         except ValueError: return self.send_json(400, {"error": "invalid_date"})
-        now_local = datetime.now(BUSINESS_TZ)
-        if selected_date < now_local.date(): return self.send_json(400, {"error": "past_date"})
-        if selected_date == now_local.date() and values["time"] <= now_local.strftime("%H:%M"): return self.send_json(400, {"error": "past_time"})
-        if selected_date.weekday() in CLOSED_WEEKDAYS: return self.send_json(400, {"error": "closed_day"})
+        if selected_date < date.today(): return self.send_json(400, {"error": "past_date"})
         if len(values["message"]) > 1000: return self.send_json(400, {"error": "message_too_long"})
+        if values["language"] not in ALLOWED_LANGUAGES: values["language"] = "ar"
         now = datetime.now(timezone.utc).isoformat(); reference = "INT-" + secrets.token_hex(3).upper()
         try:
             with db() as connection:
                 connection.execute("INSERT INTO reservations(reference,name,phone,email,service,appointment_date,appointment_time,message,language,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)", (reference,values["name"],values["phone"],values["email"],values["service"],values["date"],values["time"],values["message"],values["language"] or "ar",now,now))
         except sqlite3.IntegrityError:
             return self.send_json(409, {"error": "slot_unavailable"})
-        notify_new_reservation(values, reference)
         self.send_json(201, {"ok": True, "reference": reference})
 
     def admin_state(self):
+        with db() as connection: setup = connection.execute("SELECT 1 FROM admin WHERE id=1").fetchone() is None
         session = self.session()
-        self.send_json(200, {"setupRequired": setup_required(), "authenticated": bool(session), "csrf": session[1] if session else None})
+        self.send_json(200, {"setupRequired": setup, "authenticated": bool(session), "csrf": session[1] if session else None})
 
     def admin_setup(self):
-        if len(self.recent_auth_failures()) >= AUTH_MAX_FAILURES: return self.send_json(429, {"error": "too_many_attempts"})
+        if not WEB_SETUP: return self.send_json(403, {"error": "web_setup_disabled"})
         data = self.read_json() or {}; password = str(data.get("password", ""))
-        if not hmac.compare_digest(str(data.get("token", "")).encode(), SETUP_TOKEN.encode()):
-            self.recent_auth_failures().append(time.time())
-            return self.send_json(403, {"error": "invalid_setup_token"})
         if len(password) < 10: return self.send_json(400, {"error": "password_too_short"})
         salt = secrets.token_bytes(16); now = datetime.now(timezone.utc).isoformat()
         try:
@@ -244,18 +234,23 @@ class Handler(SimpleHTTPRequestHandler):
         return self.start_session()
 
     def admin_login(self):
-        if len(self.recent_auth_failures()) >= AUTH_MAX_FAILURES: return self.send_json(429, {"error": "too_many_attempts"})
-        data = self.read_json() or {}; password = str(data.get("password", ""))
+        client_ip = self.client_ip()
+        if len(LOGIN_FAILURES) > 5000: prune(LOGIN_FAILURES, 900)
+        failures = recent_hits(LOGIN_FAILURES, client_ip, 900)
+        if len(failures) >= 5: return self.send_json(429, {"error": "too_many_attempts"})
+        data = self.read_json() or {}; password = str(data.get("password", ""))[:200]
         with db() as connection: row = connection.execute("SELECT salt,password_hash FROM admin WHERE id=1").fetchone()
         if not row or not hmac.compare_digest(password_hash(password,bytes.fromhex(row["salt"])),row["password_hash"]):
-            self.recent_auth_failures().append(time.time())
+            LOGIN_FAILURES[client_ip] = failures + [time.time()]
             time.sleep(.35); return self.send_json(401, {"error": "invalid_credentials"})
-        AUTH_FAILURES.pop(self.client_address[0], None)
+        LOGIN_FAILURES.pop(client_ip, None)
         self.start_session()
 
     def start_session(self):
+        for key, (expires, _) in list(SESSIONS.items()):
+            if expires < time.time(): SESSIONS.pop(key, None)
         token, csrf = secrets.token_urlsafe(32), secrets.token_urlsafe(24); SESSIONS[token] = (time.time()+28_800, csrf)
-        cookie = f"intilaka_session={token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800"
+        cookie = f"intilaka_session={token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800" + ("; Secure" if SECURE_COOKIES else "")
         self.send_json(200, {"ok": True, "csrf": csrf}, {"Set-Cookie": cookie})
 
     def admin_logout(self):
@@ -290,12 +285,22 @@ class Handler(SimpleHTTPRequestHandler):
     def export_csv(self):
         if not self.require_admin(): return
         with db() as connection: rows = connection.execute("SELECT reference,name,phone,email,service,appointment_date,appointment_time,status,message,notes,created_at FROM reservations ORDER BY appointment_date,appointment_time").fetchall()
-        stream = io.StringIO(); writer = csv.writer(stream); writer.writerow(rows[0].keys() if rows else ["reference","name","phone","email","service","appointment_date","appointment_time","status","message","notes","created_at"]); writer.writerows([tuple(row) for row in rows]); body = stream.getvalue().encode("utf-8-sig")
+        stream = io.StringIO(); writer = csv.writer(stream); writer.writerow(rows[0].keys() if rows else ["reference","name","phone","email","service","appointment_date","appointment_time","status","message","notes","created_at"]); writer.writerows([tuple(csv_safe(value) for value in row) for row in rows]); body = stream.getvalue().encode("utf-8-sig")
         self.send_response(200); self.send_header("Content-Type","text/csv; charset=utf-8"); self.send_header("Content-Disposition",'attachment; filename="reservations-intilaka.csv"'); self.send_header("Content-Length",str(len(body))); self.end_headers(); self.wfile.write(body)
+
+def set_password_cli():
+    """Create or replace the admin password from the terminal (used on the server over SSH)."""
+    password = getpass.getpass("Nouveau mot de passe administrateur (10 caractères minimum) : ")
+    if len(password) < 10: sys.exit("Mot de passe trop court.")
+    if getpass.getpass("Confirmez le mot de passe : ") != password: sys.exit("Les mots de passe ne correspondent pas.")
+    salt = secrets.token_bytes(16); now = datetime.now(timezone.utc).isoformat()
+    with db() as connection:
+        connection.execute("INSERT OR REPLACE INTO admin(id,salt,password_hash,created_at) VALUES(1,?,?,?)", (salt.hex(),password_hash(password,salt),now))
+    print("Mot de passe administrateur enregistré.")
 
 if __name__ == "__main__":
     init_db()
+    if "--set-password" in sys.argv: set_password_cli(); sys.exit()
     print(f"Intilaka: http://{HOST}:{PORT}")
     print(f"Administration: http://{HOST}:{PORT}/admin")
-    if setup_required(): print(f"Code de première configuration admin : {SETUP_TOKEN}")
     ThreadingHTTPServer((HOST, PORT), Handler).serve_forever()

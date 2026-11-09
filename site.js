@@ -162,11 +162,9 @@
     });
     document.querySelector(".current-language").textContent = uiCopy[lang].language;
     document.querySelectorAll("[data-language]").forEach((button) => button.classList.toggle("active", button.dataset.language === lang));
-    document.title = lang === "ar" ? "Intilaka Group — مستقبلك في أوروبا يبدأ من هنا" : lang === "fr" ? "Intilaka Group — Votre avenir en Europe commence ici" : "Intilaka Group — Your Future in Europe Starts Here";
-    document.querySelector('meta[name="description"]').content = lang === "ar" ? "ترافقك مجموعة انطلاقة في مشاريع الدراسة والتأشيرة والإقامة والدعم الإداري في أوروبا." : lang === "fr" ? "Intilaka Group accompagne vos projets d’études, de visa, de résidence et de soutien administratif en Europe." : "Intilaka Group supports your education, visa, residency and administrative projects in Europe.";
     const activePath = document.querySelector(".path-options button.active");
     if (activePath) renderPath(activePath.dataset.path, activePath.dataset.service);
-    localStorage.setItem("intilaka-language", lang);
+    try { localStorage.setItem("intilaka-language", lang); } catch (error) {}
     closeLanguageMenu();
     closeMobileMenu();
   }
@@ -180,7 +178,13 @@
     const open = picker.classList.toggle("open");
     languageTrigger.setAttribute("aria-expanded", String(open));
   });
-  document.querySelectorAll("[data-language]").forEach((button) => button.addEventListener("click", () => setLanguage(button.dataset.language)));
+  const languagePaths = { ar:"/", fr:"/fr/", en:"/en/" };
+  document.querySelectorAll("[data-language]").forEach((button) => button.addEventListener("click", () => {
+    const target = languagePaths[button.dataset.language];
+    if (!target || button.dataset.language === currentLanguage) { closeLanguageMenu(); return; }
+    try { localStorage.setItem("intilaka-language", button.dataset.language); } catch (error) {}
+    window.location.href = target + window.location.hash;
+  }));
   document.addEventListener("click", (event) => { if (!picker.contains(event.target)) closeLanguageMenu(); });
 
   function openMobileMenu() {
@@ -393,7 +397,7 @@
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "default");
       successPanel.querySelector(".booking-reference").textContent = result.reference;
-      successPanel.querySelector(".booking-whatsapp").href = `https://wa.me/212610970256?text=${encodeURIComponent(copy.waMessage(result.reference, data.get("date"), data.get("time")))}`;
+      successPanel.querySelector(".booking-whatsapp").href = `https://wa.me/34624593940?text=${encodeURIComponent(copy.waMessage(result.reference, data.get("date"), data.get("time")))}`;
       form.reset();
       form.elements.date.min = localDate();
       form.hidden = true;
@@ -432,5 +436,5 @@
   window.addEventListener("scroll", updateHeader, {passive:true});
   window.addEventListener("resize", () => { if (window.innerWidth > 1040) closeMobileMenu(); }, {passive:true});
   updateHeader();
-  setLanguage(localStorage.getItem("intilaka-language") || "ar");
+  setLanguage(document.documentElement.lang || "ar");
 })();

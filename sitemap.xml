@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://intilakagroup.com/</loc>
+    <lastmod>2026-11-09</lastmod>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://intilakagroup.com/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://intilakagroup.com/fr/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://intilakagroup.com/en/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://intilakagroup.com/"/>
+  </url>
+  <url>
+    <loc>https://intilakagroup.com/fr/</loc>
+    <lastmod>2026-11-09</lastmod>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://intilakagroup.com/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://intilakagroup.com/fr/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://intilakagroup.com/en/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://intilakagroup.com/"/>
+  </url>
+  <url>
+    <loc>https://intilakagroup.com/en/</loc>
+    <lastmod>2026-11-09</lastmod>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://intilakagroup.com/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://intilakagroup.com/fr/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://intilakagroup.com/en/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://intilakagroup.com/"/>
+  </url>
+</urlset>

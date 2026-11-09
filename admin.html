@@ -8,8 +8,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="admin.css">
-  <link rel="stylesheet" href="admin-calendar.css">
+  <link rel="stylesheet" href="admin.css?v=20261026">
+  <link rel="stylesheet" href="admin-calendar.css?v=20261025">
 </head>
 <body>
   <main class="admin-shell">
@@ -19,7 +19,6 @@
       <h1 id="authTitle">Connexion</h1>
       <p id="authIntro">Connectez-vous pour gérer les demandes de consultation.</p>
       <form id="authForm">
-        <label class="token-field" hidden>Code de configuration<input name="token" type="text" autocomplete="off"></label>
         <label>Mot de passe<input name="password" type="password" minlength="10" autocomplete="current-password" required></label>
         <label class="confirm-field" hidden>Confirmer le mot de passe<input name="confirm" type="password" minlength="10" autocomplete="new-password"></label>
         <p class="auth-error" role="alert"></p>
@@ -31,7 +30,7 @@
     <section class="dashboard" id="dashboard" hidden>
       <header class="admin-header">
         <div class="admin-brand"><span>↗</span><p><strong>INTILAKA</strong><small>ADMINISTRATION</small></p></div>
-        <div><a class="export-button" href="/api/admin/export.csv">Exporter CSV</a><button id="logoutButton">Déconnexion</button></div>
+        <div><a class="pointage-link" href="/admin/pointage">Pointage du personnel →</a><a class="export-button" href="/api/admin/export.csv">Exporter CSV</a><button id="logoutButton">Déconnexion</button></div>
       </header>
 
       <div class="dashboard-title">
@@ -74,7 +73,7 @@
     </section>
   </main>
   <div class="calendar-detail-modal" id="calendarDetailModal" hidden><div class="calendar-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="calendarDetailTitle"><button class="calendar-detail-close" aria-label="Fermer">×</button><div class="calendar-detail-kicker">FICHE DE RENDEZ-VOUS</div><h2 id="calendarDetailTitle"></h2><div class="calendar-detail-grid" id="calendarDetailGrid"></div><label>Statut<select id="calendarDetailStatus"><option value="pending">En attente</option><option value="confirmed">Confirmée</option><option value="completed">Terminée</option><option value="cancelled">Annulée</option></select></label><label>Notes internes<textarea id="calendarDetailNotes" rows="4" maxlength="2000"></textarea></label><div class="calendar-detail-actions"><a id="calendarDetailWhatsapp" target="_blank" rel="noreferrer">WhatsApp ↗</a><button id="calendarDetailSave">Enregistrer</button></div><p id="calendarDetailFeedback" role="status"></p></div></div>
-  <script src="admin.js"></script>
-  <script src="admin-calendar.js"></script>
+  <script src="admin.js?v=20261025"></script>
+  <script src="admin-calendar.js?v=20261025"></script>
 </body>
 </html>
