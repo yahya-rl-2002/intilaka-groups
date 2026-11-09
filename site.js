@@ -404,6 +404,7 @@
       formHead.hidden = true;
       successPanel.hidden = false;
       successPanel.focus();
+      document.dispatchEvent(new CustomEvent("intilaka:booking", { detail: { service: apiService(data.get("pathway")) } }));
     } catch (error) {
       const errorMap = {slot_unavailable:copy.slot, past_date:copy.past, past_time:copy.pastTime, closed_day:copy.closed, invalid_phone:copy.phone};
       feedback.classList.add("error");
