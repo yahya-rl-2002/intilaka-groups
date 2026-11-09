@@ -393,7 +393,7 @@
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "default");
       successPanel.querySelector(".booking-reference").textContent = result.reference;
-      successPanel.querySelector(".booking-whatsapp").href = `https://wa.me/212610970256?text=${encodeURIComponent(copy.waMessage(result.reference, data.get("date"), data.get("time")))}`;
+      successPanel.querySelector(".booking-whatsapp").href = `https://wa.me/34624593940?text=${encodeURIComponent(copy.waMessage(result.reference, data.get("date"), data.get("time")))}`;
       form.reset();
       form.elements.date.min = localDate();
       form.hidden = true;
